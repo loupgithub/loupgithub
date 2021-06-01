@@ -14,7 +14,8 @@ SWBL.relativeFilePathsToLoad = [
     "SwatchBooklets_helpers/tweakableSettings.jsx",
     "SwatchBooklets_helpers/utils.jsx",
     "SwatchBooklets_helpers/pathUtils.jsx",
-    "SwatchBooklets_helpers/init.jsx"
+    "SwatchBooklets_helpers/init.jsx",
+    "SwatchBooklets_helpers/swbl.jsx"
 ];
 
 SWBL.errorBeforeLoggingAvailable = function(error) {

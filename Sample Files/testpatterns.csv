@@ -1,0 +1,5 @@
+unquotedSpaces, field with spaces, field with spaces
+quotedSpaces , " field with spaces " , " field with spaces "
+quotedQuote, " \"field with quote\" ", " \"field with quote\" "
+doubledQuote, " ""field with quote"" "," ""field with quote"" "
+missingComma, "field"   "field"
