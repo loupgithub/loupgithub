@@ -173,6 +173,12 @@ SWBL.logTrace = function(reportingFunctionArguments, s) {
     }
 }
 
+SWBL.REGEXP_TRIM = /^\s*(.*?)\s*$/;
+
+SWBL.trim = function trim(in_s) {    
+    return in_s.replace(SWBL.REGEXP_TRIM,"$1");
+}
+
 SWBL.checkMac = function checkMac() {
     
     var retVal;
