@@ -442,6 +442,7 @@ SWBL.injectData = function injectData(io_document, in_config) {
             fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP] = true;
             fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORNAME] = true;
             fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE] = true;
+            fieldsToProcessSet[SWBL.C.LOWERCASE_LABEL_SWATCH] = true;
             for (var lowerCaseFieldName in in_config.lowerCasedFieldSet) {
                 if (lowerCaseFieldName) {
                     fieldsToProcessSet[lowerCaseFieldName] = true;
@@ -517,7 +518,7 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
             }
 
             while (io_spreadState.spreadIdx >= io_document.spreads.length) {
-                io_document.spreads.lastSpread().duplicate();
+                io_document.spreads.lastItem().duplicate();
             }
 
             if (io_spreadState.spread == undefined) {
@@ -529,8 +530,27 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                     success = false;
                     break;
                 }
+                if (! io_spreadState.spreadInfo.pageItemsByName) {
+                    SWBL.logError(arguments, "need io_spreadState.spreadInfo.pageItemsByName");
+                    success = false;
+                    break;
+                }
+                if (! io_spreadState.spreadInfo.pageItemsByType) {
+                    SWBL.logError(arguments, "need io_spreadState.spreadInfo.pageItemsByType");
+                    success = false;
+                    break;
+                }
 
                 io_spreadState.pageItemsByName = io_spreadState.spreadInfo.pageItemsByName;
+                io_spreadState.pageItemsByType = io_spreadState.spreadInfo.pageItemsByType;
+
+                if (
+                    io_spreadState.pageItemsByType.swatch
+                &&
+                    io_spreadState.pageItemsByType.swatch.indexedItemLists
+                ) {
+                    io_spreadState.swatchPageItemInfoLists = io_spreadState.pageItemsByType.swatch.indexedItemLists;
+                }
 
                 for (var scanLowerCaseFieldName in io_spreadState.pageItemsByName) {
                     var pageItemsForFieldInfo = io_spreadState.pageItemsByName[scanLowerCaseFieldName];
@@ -555,12 +575,62 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
 
             success = true;
 
+            var curSpreadEntryIdx = io_spreadState.recordsUsed;
+
+            if (in_lowerCaseFieldName == SWBL.C.LOWERCASE_LABEL_SWATCH) {
+                var swatchPageItemInfoLists = undefined;
+                if (io_spreadState.swatchPageItemInfoLists) {
+                    swatchPageItemInfoLists = io_spreadState.swatchPageItemInfoLists[curSpreadEntryIdx];
+                    for (var swatchPageItemIdx = 0; swatchPageItemIdx < swatchPageItemInfoLists.length; swatchPageItemIdx++) {
+                        var swatchPageItemInfo = swatchPageItemInfoLists[swatchPageItemIdx];
+                        var swatchPageItem = io_spreadState.spread.pageItems.itemByID(swatchPageItemInfo.id);
+                        // Upcast from PageItem to more specific class
+                        swatchPageItem = swatchPageItem.getElements()[0];
+                        var colorSpace = in_config.colorSpace;
+                        var record = in_config.data[io_spreadState.recordIdx];
+                        var color = undefined;
+                        switch (colorSpace) {
+                            case SWBL.C.LOWERCASE_COLORSPACE_CMYK:
+                                color = io_document.colors.add({
+                                    model: ColorModel.PROCESS,
+                                    space: ColorSpace.CMYK,
+                                    colorValue: [ record.cyan, record.magenta, record.yellow, record.black ]
+                                });
+                                break;
+                            case SWBL.C.LOWERCASE_COLORSPACE_RGB:
+                                color = io_document.colors.add({
+                                    model: ColorModel.PROCESS,
+                                    space: ColorSpace.RGB,
+                                    colorValue: [ record.red, record.green, record.blue ]
+                                });
+                                break;
+                            case SWBL.C.LOWERCASE_COLORSPACE_LAB:
+                                color = io_document.colors.add({
+                                    model: ColorModel.PROCESS,
+                                    space: ColorSpace.LAB,
+                                    colorValue: [ record.L, record.a, record.b ]
+                                });
+                                break;
+                        }
+
+                        if (! color) {
+                            SWBL.logError(arguments, "cannot create color");
+                            success = false;
+                            break;
+                        }
+                        else {
+                            swatchPageItem.fillColor = color;
+                        }
+                    }
+                }
+                break;
+            }
+
             var pageItemsForFieldInfo = io_spreadState.pageItemsByName[in_lowerCaseFieldName];
             if (! pageItemsForFieldInfo) {
                 break;
             }
 
-            var curSpreadEntryIdx = io_spreadState.recordsUsed;
             var pageItemInfoList = pageItemsForFieldInfo.indexedItemLists[curSpreadEntryIdx];
             if (! pageItemInfoList) {
                 SWBL.logWarning(arguments, "Spread is missing " + in_lowerCaseFieldName + "_" + (curSpreadEntryIdx + 1));
@@ -575,11 +645,11 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                 if (pageItem instanceof TextFrame) {
                     var parentStory = pageItem.parentStory;
                     if (parentStory.characters.length < 1) {
-                        pageItem.insertionPoints.item(0).contents = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
+                        parentStory.insertionPoints.item(0).contents = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
                     }
                     else {
-                        pageItem.parentStory.characters.itemByRange(1, pageItem.parentStory.characters.length - 1);
-                        pageItem.insertionPoints.item(1).contents = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
+                        parentStory.characters.itemByRange(1, parentStory.characters.length - 1).remove();
+                        parentStory.insertionPoints.item(1).contents = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
                         parentStory.characters.firstItem().remove();
                     }
                 }
@@ -873,12 +943,12 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
 
             if (
             !   (            
-                    (SWBL.C.LOWERCASE_FIELDNAME_COLORMODEL in io_config.lowerCasedFieldSet)
+                    (SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE in io_config.lowerCasedFieldSet)
                 ||
-                    (in_optionalCSVMap && (SWBL.C.LOWERCASE_FIELDNAME_COLORMODEL in in_optionalCSVMap.fieldMapInternalToDefault))
+                    (in_optionalCSVMap && (SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE in in_optionalCSVMap.fieldMapInternalToDefault))
                 ) 
             ) {
-                SWBL.logError(arguments, "need field " + SWBL.C.LOWERCASE_FIELDNAME_COLORMODEL);
+                SWBL.logError(arguments, "need field " + SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE);
                 break;
             }
 
@@ -895,7 +965,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
 
             var colorGroupFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP];
             var colorNameFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORNAME];
-            var colorModelFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORMODEL];
+            var colorSpaceFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE];
             var colorPageFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE];
 
             if (! io_config.data) {
@@ -960,7 +1030,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                 blackFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE4];
             }
 
-            io_config.colorModel = undefined;
+            io_config.colorSpace = undefined;
             io_config.colorGroup = undefined;
             io_config.csvMap = in_optionalCSVMap;
 
@@ -978,9 +1048,9 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                     colorName = in_optionalCSVMap.fieldMapInternalToDefault.colorname;
                 }
 
-                var colorModel = colorData[colorModelFieldIdx];
-                if (in_optionalCSVMap && colorModel === undefined) {
-                    colorModel = in_optionalCSVMap.fieldMapInternalToDefault.colormodel;
+                var colorSpace = colorData[colorSpaceFieldIdx];
+                if (in_optionalCSVMap && colorSpace === undefined) {
+                    colorSpace = in_optionalCSVMap.fieldMapInternalToDefault.colorspace;
                 }
 
                 var colorPage = colorData[colorPageFieldIdx];
@@ -990,23 +1060,23 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
 
                 var colorIsOK = true;
 
-                if (! colorModel) {
+                if (! colorSpace) {
                     colorIsOK = false;
                     SWBL.logError(arguments, "no color type for color #" + (colorIdx + 1));
                 }
                 else {
 
-                    var lowercaseColorModel = colorModel.toLowerCase();
-                    if (! (lowercaseColorModel in SWBL.C.SET_LOWERCASE_COLORMODEL)) {
+                    var lowercaseColorSpace = colorSpace.toLowerCase();
+                    if (! (lowercaseColorSpace in SWBL.C.SET_LOWERCASE_COLORSPACE)) {
                         colorIsOK = false;
                         SWBL.logError(arguments, "unexpected color type for color #" + (colorIdx + 1));
                     }
 
-                    if (io_config.colorModel === undefined) {
-                        io_config.colorModel = lowercaseColorModel;
+                    if (io_config.colorSpace === undefined) {
+                        io_config.colorSpace = lowercaseColorSpace;
                     }
-                    else if (io_config.colorModel != SWBL.C.LOWERCASE_COLORMODEL_MULTIPLE && io_config.colorModel != lowercaseColorModel) {
-                        io_config.colorModel = SWBL.C.LOWERCASE_COLORMODEL_MULTIPLE; 
+                    else if (io_config.colorSpace != SWBL.C.LOWERCASE_COLORSPACE_MULTIPLE && io_config.colorSpace != lowercaseColorSpace) {
+                        io_config.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_MULTIPLE; 
                         SWBL.logWarning(arguments, "multiple color models in CSV");
                     }
                 }
@@ -1035,14 +1105,14 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                 }
 
                 if (colorIsOK) {
-                    switch (lowercaseColorModel) {
+                    switch (lowercaseColorSpace) {
 
                         default:
                             colorIsOK = false;
                             SWBL.logError(arguments, "unexpected color type for color #" + (colorIdx + 1));
                             break;
                         
-                        case SWBL.C.LOWERCASE_COLORMODEL_RGB:
+                        case SWBL.C.LOWERCASE_COLORSPACE_RGB:
 
                             var red = colorData[redFieldIdx];
                             if (in_optionalCSVMap && red === undefined) {
@@ -1077,7 +1147,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                                 green = parseInt(green, 10);
                                 blue = parseInt(blue, 10);
 
-                                colorData.colorModel = SWBL.C.LOWERCASE_COLORMODEL_RGB;
+                                colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_RGB;
                                 colorData.colorGroup = colorGroup;
                                 colorData.colorPage = colorPage;
 
@@ -1087,7 +1157,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                             }
                             break;
 
-                        case SWBL.C.LOWERCASE_COLORMODEL_LAB:
+                        case SWBL.C.LOWERCASE_COLORSPACE_LAB:
 
                             var L = colorData[lFieldIdx];
                             if (in_optionalCSVMap && L === undefined) {
@@ -1122,7 +1192,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                                 a = parseFloat(a);
                                 b = parseFloat(b);
 
-                                colorData.colorModel = SWBL.C.LOWERCASE_COLORMODEL_LAB;
+                                colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_LAB;
                                 colorData.colorGroup = colorGroup;
                                 colorData.colorPage = colorPage;
 
@@ -1132,7 +1202,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                             }
                             break;
 
-                        case SWBL.C.LOWERCASE_COLORMODEL_CMYK:
+                        case SWBL.C.LOWERCASE_COLORSPACE_CMYK:
                         
                             var cyan = colorData[cyanFieldIdx];
                             if (in_optionalCSVMap && cyan === undefined) {
@@ -1177,7 +1247,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                                 yellow = parseInt(yellow, 10);
                                 black = parseInt(black, 10);
 
-                                colorData.colorModel = SWBL.C.LOWERCASE_COLORMODEL_CMYK;
+                                colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_CMYK;
                                 colorData.colorGroup = colorGroup;
                                 colorData.colorPage = colorPage;
 
