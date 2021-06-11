@@ -5,6 +5,151 @@ if ("undefined" == typeof SWBL) {
     SWBL = {};
 }
 
+SWBL.analyzeSpread = function analyzeSpread(in_spread) {
+
+    var retVal = undefined;
+
+    SWBL.logEntry(arguments);
+
+    do {
+
+        try {
+
+            if (! (in_spread instanceof Spread)) {
+                SWBL.logError(arguments, "need in_spread");
+                break;
+            }
+
+            var spreadData = {};
+            spreadData.pageItemsByType = {};
+            spreadData.pageItemsByName = {};
+
+            var allPageItems = in_spread.allPageItems.slice(0);
+            for (var pageItemIdx = 0; pageItemIdx < allPageItems.length; pageItemIdx++) {
+
+                do {
+                    try {
+                        var pageItem = allPageItems[pageItemIdx];
+                        var pageItemId = pageItem.id;
+                        var scriptLabel = SWBL.trim(pageItem.label);
+                        if (! scriptLabel) {
+                            break;
+                        }
+                        var parsedScriptLabel = SWBL.parseScriptLabel(scriptLabel);
+                        if (! parsedScriptLabel) {
+                            break;
+                        }
+                        var pageItemsByType = spreadData.pageItemsByType[parsedScriptLabel.type];
+
+                        if (! pageItemsByType) {
+                            pageItemsByType = {};
+                            spreadData.pageItemsByType[parsedScriptLabel.type] = pageItemsByType;
+                        }
+
+                        var pageItemInfo = {
+                            id: pageItem.id,
+                            type: parsedScriptLabel.type,
+                            name: parsedScriptLabel.name,
+                            idx: parsedScriptLabel.idx
+                        };
+                        if (parsedScriptLabel.idx === undefined) {
+
+                            var nonIndexedItemList = pageItemsByType.nonIndexedItemList;
+                            if (! nonIndexedItemList) {
+                                nonIndexedItemList = [];
+                                pageItemsByType.nonIndexedItemList = nonIndexedItemList;
+                            }
+                            nonIndexedItemList.push(pageItemInfo);
+                        }
+                        else {
+
+                            var indexedItemLists = pageItemsByType.indexedItemLists;
+                            if (! indexedItemLists) {
+                                indexedItemLists = [];
+                                pageItemsByType.indexedItemLists = indexedItemLists;
+                            }
+
+                            var itemForIdxList = indexedItemLists[parsedScriptLabel.idx];
+                            if (! itemForIdxList) {
+                                itemForIdxList = [];
+                                indexedItemLists[parsedScriptLabel.idx] = itemForIdxList;
+                            }
+
+                            itemForIdxList.push(pageItemInfo);
+
+                        }
+
+                        if (! parsedScriptLabel.name) {
+                            break;
+                        }
+
+                        var pageItemsByName = spreadData.pageItemsByName[parsedScriptLabel.name];
+                        if (! pageItemsByName) {
+                            pageItemsByName = {};                            
+                            spreadData.pageItemsByName[parsedScriptLabel.name] = pageItemsByName;
+                        }
+
+                        if (parsedScriptLabel.idx === undefined) {
+                            var nonIndexedItemList = pageItemsByName.nonIndexedItemList;
+                            if (! nonIndexedItemList) {
+                                nonIndexedItemList = [];
+                                pageItemsByName.nonIndexedItemList = nonIndexedItemList;
+                            }
+                            nonIndexedItemList.push(pageItemInfo);
+                            break;
+                        }
+
+                        var indexedItemLists = pageItemsByName.indexedItemLists;
+                        if (! indexedItemLists) {
+                            indexedItemLists = [];
+                            pageItemsByName.indexedItemLists = indexedItemLists;
+                        }
+
+                        var itemForIdxList = indexedItemLists[parsedScriptLabel.idx];
+                        if (! itemForIdxList) {
+                            itemForIdxList = [];
+                            indexedItemLists[parsedScriptLabel.idx] = itemForIdxList;
+                        }
+
+                        itemForIdxList.push(pageItemInfo);
+
+                        if (
+                            pageItemsByName.minIdx === undefined 
+                        || 
+                            pageItemsByName.minIdx > parsedScriptLabel.idx
+                        ) {
+                            pageItemsByName.minIdx = parsedScriptLabel.idx;
+                        }
+
+                        if (
+                            pageItemsByName.maxIdx === undefined 
+                        || 
+                            pageItemsByName.maxIdx < parsedScriptLabel.idx
+                        ) {
+                            pageItemsByName.maxIdx = parsedScriptLabel.idx;
+                        }
+                    }
+                    catch (err) {
+                        SWBL.logError(arguments, "page item throws " + err);
+                    }
+                }
+                while (false);
+            }
+
+            retVal = spreadData;
+
+        }
+        catch (err) {
+            SWBL.logError(arguments, "throws " + err);
+        }
+    }
+    while (false);
+
+    SWBL.logExit(arguments);
+
+    return retVal;
+}
+
 SWBL.csvLineSplit = function csvLineSplit(in_csvLine) {
 
     var retVal = undefined;
@@ -139,12 +284,11 @@ SWBL.csvLineSplit = function csvLineSplit(in_csvLine) {
     SWBL.logExit(arguments);
 
     return retVal;
-
 }
 
 SWBL.getFieldValue = function getFieldValue(in_config, in_fieldName, in_csvRecord) {
 
-    var retVal = undefined;
+    var retVal = "";
 
     SWBL.logEntry(arguments);
 
@@ -168,15 +312,6 @@ SWBL.getFieldValue = function getFieldValue(in_config, in_fieldName, in_csvRecor
 
             var fieldIdx = undefined;
             var fieldNameLowerCase = in_fieldName.toLowerCase();
-            if (
-                in_config.csvMap 
-            && 
-                in_config.csvMap.fieldMapInternalToCSV 
-            && 
-                fieldNameLowerCase in in_config.csvMap.fieldMapInternalToCSV
-            ) {
-                fieldNameLowerCase = in_config.csvMap.fieldMapInternalToCSV[fieldNameLowerCase].toLowerCase();
-            }
 
             if (! fieldNameLowerCase in in_config.lowerCasedFieldSet) {
                 SWBL.logError(arguments, "unknown field " + in_fieldName);
@@ -251,7 +386,7 @@ SWBL.getFieldValueByRecordIdx = function getFieldValueByRecordIdx(in_config, in_
     return retVal;
 }
 
-SWBL.getRecordCount = function getFieldValueByRecordIdx(in_config) {
+SWBL.getRecordCount = function getRecordCount(in_config) {
 
     var retVal = undefined;
 
@@ -276,6 +411,190 @@ SWBL.getRecordCount = function getFieldValueByRecordIdx(in_config) {
     SWBL.logExit(arguments);
 
     return retVal;
+}
+
+SWBL.injectData = function injectData(io_document, in_config) {
+
+    var success = false;
+
+    SWBL.logEntry(arguments);
+
+    do {
+        try {
+
+            if (! (io_document instanceof Document)) {
+                SWBL.logError(arguments, "need io_document");
+                break;
+            }
+            
+            if (! in_config) {
+                SWBL.logError(arguments, "need in_config");
+                break;
+            }
+
+            var recordCount = SWBL.getRecordCount(in_config);
+            if (! recordCount) {
+                SWBL.logError(arguments, "0 records");
+                break;
+            }
+
+            var fieldsToProcessSet = {};
+            fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP] = true;
+            fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORNAME] = true;
+            fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE] = true;
+            for (var lowerCaseFieldName in in_config.lowerCasedFieldSet) {
+                if (lowerCaseFieldName) {
+                    fieldsToProcessSet[lowerCaseFieldName] = true;
+                }
+            }
+
+            var spreadState = {};
+            spreadState.spreadIdx = 0;
+            spreadState.recordsUsed = 0;
+            spreadState.recordIdx = undefined;
+            spreadState.spread = undefined;
+
+            success = true;
+
+            for (spreadState.recordIdx = 0; spreadState.recordIdx < recordCount; spreadState.recordIdx++) {
+                for (var lowerCaseFieldName in fieldsToProcessSet) {
+                    success = SWBL.injectField(io_document, in_config, spreadState, lowerCaseFieldName);
+                    if (! success) {
+                        break;
+                    }
+                }
+                spreadState.recordsUsed++;                
+            }
+
+        }
+        catch (err) {
+            SWBL.logError(arguments, "throws " + err);
+            success = false;
+        }
+    }
+    while (false);
+
+    SWBL.logExit(arguments);
+
+    return success;
+}
+
+SWBL.injectField = function injectField(io_document, in_config, io_spreadState, in_lowerCaseFieldName) {
+
+    var success = false;
+
+    SWBL.logEntry(arguments);
+
+    do {
+
+        try {
+
+            if (! (io_document instanceof Document)) {
+                SWBL.logError(arguments, "need io_document");
+                break;
+            }
+            
+            if (! in_config) {
+                SWBL.logError(arguments, "need in_config");
+                break;
+            }
+
+            if (! io_spreadState) {
+                SWBL.logError(arguments, "need io_spreadState");
+                break;
+            }
+
+            if (! in_lowerCaseFieldName) {
+                SWBL.logError(arguments, "need in_lowerCaseFieldName");
+                break;
+            }
+
+            if (io_spreadState.maxIdx && io_spreadState.recordsUsed >= io_spreadState.maxIdx) {
+                io_spreadState.spreadIdx++;
+                io_spreadState.spread = undefined;
+                io_spreadState.recordsUsed = 0;
+                io_spreadState.maxIdx = undefined;
+            }
+
+            while (io_spreadState.spreadIdx >= io_document.spreads.length) {
+                io_document.spreads.lastSpread().duplicate();
+            }
+
+            if (io_spreadState.spread == undefined) {
+
+                io_spreadState.spread = io_document.spreads.item(io_spreadState.spreadIdx);
+                io_spreadState.spreadInfo = SWBL.analyzeSpread(io_spreadState.spread);
+                if (! io_spreadState.spreadInfo) {
+                    SWBL.logError(arguments, "need io_spreadState.spreadInfo");
+                    success = false;
+                    break;
+                }
+
+                io_spreadState.pageItemsByName = io_spreadState.spreadInfo.pageItemsByName;
+
+                for (var scanLowerCaseFieldName in io_spreadState.pageItemsByName) {
+                    var pageItemsForFieldInfo = io_spreadState.pageItemsByName[scanLowerCaseFieldName];
+                    if (pageItemsForFieldInfo.minIdx != 0) {
+                        SWBL.logWarning(arguments, "Spread is missing " + scanLowerCaseFieldName + "_1");
+                    }
+
+                    if (io_spreadState.maxIdx === undefined) {
+                        io_spreadState.maxIdx = pageItemsForFieldInfo.maxIdx;
+                        io_spreadState.maxIdxIsForField = scanLowerCaseFieldName;
+                    }
+                    else {
+                        if (io_spreadState.maxIdx != pageItemsForFieldInfo.maxIdx) {
+                            SWBL.logWarning(arguments, "Spread has incorrect number of occurrences for certain fields: " + io_spreadState.maxIdxIsForField + " vs. " + scanLowerCaseFieldName);
+                        }
+                        if (io_spreadState.maxIdx < pageItemsForFieldInfo.maxId) {
+                            io_spreadState.maxIdx = pageItemsForFieldInfo.maxId;
+                        }
+                    }
+                }
+            }
+
+            success = true;
+
+            var pageItemsForFieldInfo = io_spreadState.pageItemsByName[in_lowerCaseFieldName];
+            if (! pageItemsForFieldInfo) {
+                break;
+            }
+
+            var curSpreadEntryIdx = io_spreadState.recordsUsed;
+            var pageItemInfoList = pageItemsForFieldInfo.indexedItemLists[curSpreadEntryIdx];
+            if (! pageItemInfoList) {
+                SWBL.logWarning(arguments, "Spread is missing " + in_lowerCaseFieldName + "_" + (curSpreadEntryIdx + 1));
+                break;
+            }
+
+            for (var pageItemIdx = 0; pageItemIdx < pageItemInfoList.length; pageItemIdx++) {
+                var pageItemInfo = pageItemInfoList[pageItemIdx];
+                var pageItem = io_spreadState.spread.pageItems.itemByID(pageItemInfo.id);
+                // Upcast from PageItem to more specific class
+                pageItem = pageItem.getElements()[0];
+                if (pageItem instanceof TextFrame) {
+                    var parentStory = pageItem.parentStory;
+                    if (parentStory.characters.length < 1) {
+                        pageItem.insertionPoints.item(0).contents = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
+                    }
+                    else {
+                        pageItem.parentStory.characters.itemByRange(1, pageItem.parentStory.characters.length - 1);
+                        pageItem.insertionPoints.item(1).contents = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
+                        parentStory.characters.firstItem().remove();
+                    }
+                }
+            }
+        }
+        catch (err) {
+            SWBL.logError(arguments, "throws " + err);
+            success = false;
+        }
+    }
+    while (false);
+
+    SWBL.logExit(arguments);
+
+    return success;
 }
 
 SWBL.openTemplate = function openTemplate(in_csvFile) {
@@ -403,6 +722,103 @@ SWBL.parseCSV = function parseCSV(in_csvFile, in_optionalCSVMap) {
             }
 
             retVal = parsedData;
+        }
+        catch (err) {
+            SWBL.logError(arguments, "throws " + err);
+        }
+    }
+    while (false);
+
+    SWBL.logExit(arguments);
+
+    return retVal;
+}
+
+SWBL.parseScriptLabel = function parseScriptLabel(in_label) {
+
+    var retVal = undefined;
+
+    SWBL.logEntry(arguments);
+
+    do {
+
+        try {
+
+            if (! in_label) {
+                SWBL.logError(arguments, "need in_label");
+                break;
+            }
+
+            var label = SWBL.trim(in_label.toLowerCase());
+
+            // Labels are of the form 
+            //
+            //   colorpage
+            //   colorgroup
+            //   name
+            //   name_idx (e.g. swatch_3)
+            // 
+            if (label == SWBL.C.LOWERCASE_LABEL_COLORGROUP) {
+                retVal = {
+                    type: SWBL.C.LOWERCASE_LABEL_COLORGROUP
+                };
+                break;
+            }
+
+            if (label == SWBL.C.LOWERCASE_LABEL_COLORPAGE) {
+                retVal = {
+                    type: SWBL.C.LOWERCASE_LABEL_COLORPAGE
+                };
+                break;
+            }
+
+            var labelSplit = in_label.split("_");
+            var itemName = labelSplit[0];
+            if (! itemName) {
+                break;
+            }
+
+            if (labelSplit.length == 1) {
+                retVal = {
+                    type: SWBL.C.LOWERCASE_LABEL_FIELD,
+                    name: itemName
+                };
+                break;
+            }
+
+            if (labelSplit.length != 2) {
+                break;
+            }
+
+            var itemIdx = labelSplit[1];
+            if (! itemIdx) {
+                break;
+            }
+
+            itemIdx = parseInt(itemIdx, 10);
+            if (itemIdx == NaN || itemIdx < 1) {
+                break;
+            }
+
+            // Swap 1-based index with 0-based index
+            itemIdx--;
+
+            if (itemName == SWBL.C.LOWERCASE_LABEL_SWATCH) {
+                retVal = {
+                    type: SWBL.C.LOWERCASE_LABEL_SWATCH,
+                    idx: itemIdx
+                };
+                break;
+            }
+
+            retVal = {
+                type: SWBL.C.LOWERCASE_LABEL_INDEXED_FIELD,
+                name: itemName,
+                idx: itemIdx
+            };
+
+            break;
+
         }
         catch (err) {
             SWBL.logError(arguments, "throws " + err);
@@ -613,7 +1029,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                     SWBL.logError(arguments, "no color name for color #" + (colorIdx + 1));
                 }
 
-                if (! colorPage) {
+                if (colorPage === undefined) {
                     colorIsOK = false;
                     SWBL.logError(arguments, "no color page for color #" + (colorIdx + 1));
                 }
@@ -780,6 +1196,7 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
         }
         catch (err) {
             SWBL.logError(arguments, "throws " + err);
+            success = false;
         }
     }
     while (false);

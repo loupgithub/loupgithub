@@ -26,6 +26,12 @@ SWBL.C.DATA_FILE_EXTENSIONS_LOWERCASED = [ 'csv', 'txt' ]; // Always use lowerca
 SWBL.C.ALERT_BAD_DATA                  = "Failed to parse CSV file. Aborting";
 SWBL.C.ALERT_NO_TEMPLATE               = "Could not find template in same folder as CSV file"
 
+SWBL.C.LOWERCASE_LABEL_COLORGROUP      = "colorgroup";
+SWBL.C.LOWERCASE_LABEL_COLORPAGE       = "colorpage";
+SWBL.C.LOWERCASE_LABEL_FIELD           = "field"; // label is whatever field name
+SWBL.C.LOWERCASE_LABEL_SWATCH          = "swatch"; // label is swatch_1, swatch_2,...
+SWBL.C.LOWERCASE_LABEL_INDEXED_FIELD   = "idx"; // label is whatever field name with idx- e.g. a_1, L_2, cyan_3,...
+
 SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP  = "colorgroup";
 SWBL.C.LOWERCASE_FIELDNAME_COLORNAME   = "colorname";
 SWBL.C.LOWERCASE_FIELDNAME_COLORMODEL  = "colormodel";
