@@ -30,15 +30,26 @@ SWBL.analyzeSpread = function analyzeSpread(in_spread) {
                 do {
                     try {
                         var pageItem = allPageItems[pageItemIdx];
+
                         var pageItemId = pageItem.id;
+
                         var scriptLabel = SWBL.trim(pageItem.label);
                         if (! scriptLabel) {
                             break;
                         }
+
                         var parsedScriptLabel = SWBL.parseScriptLabel(scriptLabel);
                         if (! parsedScriptLabel) {
                             break;
                         }
+
+                        if (parsedScriptLabel.type == SWBL.C.LOWERCASE_LABEL_SWATCH) {
+                            pageItem.fillColor = "None";
+                        }
+                        else if (pageItem instanceof TextFrame) {
+                            pageItem.parentStory.contents = "";
+                        }
+
                         var pageItemsByType = spreadData.pageItemsByType[parsedScriptLabel.type];
 
                         if (! pageItemsByType) {
@@ -52,6 +63,7 @@ SWBL.analyzeSpread = function analyzeSpread(in_spread) {
                             name: parsedScriptLabel.name,
                             idx: parsedScriptLabel.idx
                         };
+
                         if (parsedScriptLabel.idx === undefined) {
 
                             var nonIndexedItemList = pageItemsByType.nonIndexedItemList;
@@ -59,6 +71,7 @@ SWBL.analyzeSpread = function analyzeSpread(in_spread) {
                                 nonIndexedItemList = [];
                                 pageItemsByType.nonIndexedItemList = nonIndexedItemList;
                             }
+
                             nonIndexedItemList.push(pageItemInfo);
                         }
                         else {
@@ -76,7 +89,6 @@ SWBL.analyzeSpread = function analyzeSpread(in_spread) {
                             }
 
                             itemForIdxList.push(pageItemInfo);
-
                         }
 
                         if (! parsedScriptLabel.name) {
@@ -313,19 +325,17 @@ SWBL.getFieldValue = function getFieldValue(in_config, in_fieldName, in_csvRecor
             var fieldIdx = undefined;
             var fieldNameLowerCase = in_fieldName.toLowerCase();
 
-            if (! fieldNameLowerCase in in_config.lowerCasedFieldSet) {
-                SWBL.logError(arguments, "unknown field " + in_fieldName);
+            if (! (fieldNameLowerCase in in_config.lowerCasedFieldSet)) {
                 break;
             }
 
             var fieldIdx = in_config.lowerCasedFieldSet[fieldNameLowerCase];
             if (fieldIdx === undefined) {
-                SWBL.logError(arguments, "unknown field " + in_fieldName);
+                SWBL.logError(arguments, "Unknown field " + in_fieldName);
                 break;
             }
 
             if (fieldIdx < 0 || fieldIdx >= in_csvRecord.length) {
-                SWBL.logError(arguments, "fieldIdx " + fieldIdx + " out of in_csvRecord range for " + in_fieldName);
                 break;
             }
 
@@ -344,7 +354,7 @@ SWBL.getFieldValue = function getFieldValue(in_config, in_fieldName, in_csvRecor
 
 SWBL.getFieldValueByRecordIdx = function getFieldValueByRecordIdx(in_config, in_fieldName, in_recordIdx) {
 
-    var retVal = undefined;
+    var retVal = "";
 
     SWBL.logEntry(arguments);
 
@@ -367,7 +377,6 @@ SWBL.getFieldValueByRecordIdx = function getFieldValueByRecordIdx(in_config, in_
             }
 
             if (in_recordIdx < 0 || in_recordIdx >= in_config.data.length) {
-                SWBL.logError(arguments, "in_recordIdx " + in_recordIdx + " is out of range");
                 break;
             }
 
@@ -451,20 +460,25 @@ SWBL.injectData = function injectData(io_document, in_config) {
 
             var spreadState = {};
             spreadState.spreadIdx = 0;
-            spreadState.recordsUsed = 0;
+            spreadState.recordsUsedOnSpread = 0;
             spreadState.recordIdx = undefined;
             spreadState.spread = undefined;
+            spreadState.colorGroup = undefined;
+            spreadState.recordCountToProcess = recordCount;
+            spreadState.recordIdx = 0;
 
             success = true;
 
-            for (spreadState.recordIdx = 0; spreadState.recordIdx < recordCount; spreadState.recordIdx++) {
+            while (spreadState.recordCountToProcess > 0) {
                 for (var lowerCaseFieldName in fieldsToProcessSet) {
                     success = SWBL.injectField(io_document, in_config, spreadState, lowerCaseFieldName);
                     if (! success) {
                         break;
                     }
                 }
-                spreadState.recordsUsed++;                
+                spreadState.recordsUsedOnSpread++;
+                spreadState.recordCountToProcess--;
+                spreadState.recordIdx++;
             }
 
         }
@@ -510,31 +524,85 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                 break;
             }
 
-            if (io_spreadState.maxIdx && io_spreadState.recordsUsed >= io_spreadState.maxIdx) {
-                io_spreadState.spreadIdx++;
-                io_spreadState.spread = undefined;
-                io_spreadState.recordsUsed = 0;
-                io_spreadState.maxIdx = undefined;
+            if (io_spreadState.initialized) {
+
+                var skippedRecords = 0;
+                if (io_spreadState.colorGroupRecordIdx != io_spreadState.recordIdx) {
+                    io_spreadState.colorGroupRecordIdx = io_spreadState.recordIdx;
+                    var colorGroup = SWBL.getFieldValueByRecordIdx(in_config, SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP, io_spreadState.recordIdx);
+                    if (colorGroup != io_spreadState.colorGroup) {
+                        io_spreadState.colorGroup = colorGroup;
+                        var groupSkippedRecords = io_spreadState.spreadRecordCount - io_spreadState.recordsUsedOnSpread;
+                        if (groupSkippedRecords > skippedRecords) {
+                            skippedRecords = groupSkippedRecords;
+                        }
+                    }
+                }
+
+                if (io_spreadState.colorPageRecordIdx != io_spreadState.recordIdx) {
+                    io_spreadState.colorPageRecordIdx = io_spreadState.recordIdx;
+                    var colorPage = SWBL.getFieldValueByRecordIdx(in_config, SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE, io_spreadState.recordIdx);
+                    if (colorPage != "") {
+                        if (colorPage != io_spreadState.colorPage) {
+                            io_spreadState.colorPage = colorPage;
+                            var pageSkippedRecords = io_spreadState.spreadRecordCount - io_spreadState.recordsUsedOnSpread;
+                            if (pageSkippedRecords > skippedRecords) {
+                                skippedRecords = pageSkippedRecords;
+                            }
+                        }
+                    }
+                }
+
+                io_spreadState.recordsUsedOnSpread += skippedRecords;
+
+                if (io_spreadState.recordsUsedOnSpread >= io_spreadState.spreadRecordCount) {
+                    io_spreadState.spreadIdx++;
+                    io_spreadState.spread = undefined;
+                    io_spreadState.recordsUsedOnSpread = 0;
+                    io_spreadState.maxIdx = undefined;
+                    io_spreadState.initializedColorPage = undefined;
+                }
             }
 
-            while (io_spreadState.spreadIdx >= io_document.spreads.length) {
-                io_document.spreads.lastItem().duplicate();
+            if (io_spreadState.spreadIdx >= io_document.spreads.length) {
+                var needNewSection = false;
+                if (io_spreadState.colorPage) {
+                    var colorPage = parseInt(io_spreadState.colorPage, 10);
+                    var lastSpread = io_document.spreads.lastItem();
+                    var lastPage = lastSpread.pages.firstItem();
+                    var lastPageNumber = parseInt(lastPage.name);
+                    if (colorPage != lastPageNumber + 1) {
+                        needNewSection = true;
+                    }
+                }
+                while (io_spreadState.spreadIdx >= io_document.spreads.length) {
+                    io_document.spreads.lastItem().duplicate();
+                }
+                if (needNewSection) {
+                    lastSpread = io_document.spreads.lastItem();
+                    lastPage = lastSpread.pages.firstItem();
+                    var newSection = io_document.sections.add(lastPage);
+                    newSection.continueNumbering = false;
+                }           
             }
 
             if (io_spreadState.spread == undefined) {
 
                 io_spreadState.spread = io_document.spreads.item(io_spreadState.spreadIdx);
                 io_spreadState.spreadInfo = SWBL.analyzeSpread(io_spreadState.spread);
+
                 if (! io_spreadState.spreadInfo) {
                     SWBL.logError(arguments, "need io_spreadState.spreadInfo");
                     success = false;
                     break;
                 }
+                
                 if (! io_spreadState.spreadInfo.pageItemsByName) {
                     SWBL.logError(arguments, "need io_spreadState.spreadInfo.pageItemsByName");
                     success = false;
                     break;
                 }
+                
                 if (! io_spreadState.spreadInfo.pageItemsByType) {
                     SWBL.logError(arguments, "need io_spreadState.spreadInfo.pageItemsByType");
                     success = false;
@@ -553,9 +621,12 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                 }
 
                 for (var scanLowerCaseFieldName in io_spreadState.pageItemsByName) {
+
                     var pageItemsForFieldInfo = io_spreadState.pageItemsByName[scanLowerCaseFieldName];
                     if (pageItemsForFieldInfo.minIdx != 0) {
-                        SWBL.logWarning(arguments, "Spread is missing " + scanLowerCaseFieldName + "_1");
+                        for (var missingMinIdx = 0; missingMinIdx < pageItemsForFieldInfo.minIdx; missingMinIdx++) {
+                            SWBL.logWarning(arguments, "Spread is missing " + scanLowerCaseFieldName + "_" + (missingMinIdx+1));
+                        }
                     }
 
                     if (io_spreadState.maxIdx === undefined) {
@@ -571,11 +642,34 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                         }
                     }
                 }
+                io_spreadState.spreadRecordCount = io_spreadState.maxIdx + 1;
+
+                if (! io_spreadState.initialized) {
+                    io_spreadState.initialized = true;
+
+                    io_spreadState.colorGroupRecordIdx = io_spreadState.recordIdx;
+                    io_spreadState.colorGroup = SWBL.getFieldValueByRecordIdx(in_config, SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP, io_spreadState.recordIdx);
+
+                    io_spreadState.colorPageRecordIdx = io_spreadState.recordIdx;
+                    io_spreadState.colorPage = SWBL.getFieldValueByRecordIdx(in_config, SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE, io_spreadState.recordIdx);
+                }
+
+                if (io_spreadState.initializedColorPage === undefined) {
+                    io_spreadState.initializedColorPage = io_spreadState.colorPage;
+                    var page = io_spreadState.spread.pages.firstItem();
+                    var pageName = page.name;
+                    if (io_spreadState.colorPage && pageName != io_spreadState.colorPage) {
+                       var section = page.appliedSection;
+                       section.sectionPrefix = "";
+                       section.pageNumberStart = parseInt(io_spreadState.colorPage, 10);
+                    }
+                }
+
             }
 
             success = true;
 
-            var curSpreadEntryIdx = io_spreadState.recordsUsed;
+            var curSpreadEntryIdx = io_spreadState.recordsUsedOnSpread;
 
             if (in_lowerCaseFieldName == SWBL.C.LOWERCASE_LABEL_SWATCH) {
                 var swatchPageItemInfoLists = undefined;
@@ -589,37 +683,36 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                         var colorSpace = in_config.colorSpace;
                         var record = in_config.data[io_spreadState.recordIdx];
                         var color = undefined;
-                        switch (colorSpace) {
-                            case SWBL.C.LOWERCASE_COLORSPACE_CMYK:
-                                color = io_document.colors.add({
-                                    model: ColorModel.PROCESS,
-                                    space: ColorSpace.CMYK,
-                                    colorValue: [ record.cyan, record.magenta, record.yellow, record.black ]
-                                });
-                                break;
-                            case SWBL.C.LOWERCASE_COLORSPACE_RGB:
-                                color = io_document.colors.add({
-                                    model: ColorModel.PROCESS,
-                                    space: ColorSpace.RGB,
-                                    colorValue: [ record.red, record.green, record.blue ]
-                                });
-                                break;
-                            case SWBL.C.LOWERCASE_COLORSPACE_LAB:
-                                color = io_document.colors.add({
-                                    model: ColorModel.PROCESS,
-                                    space: ColorSpace.LAB,
-                                    colorValue: [ record.L, record.a, record.b ]
-                                });
-                                break;
+                        if (io_spreadState.recordIdx < in_config.data.length) {
+                            switch (colorSpace) {
+                                case SWBL.C.LOWERCASE_COLORSPACE_CMYK:
+                                    color = io_document.colors.add({
+                                        model: ColorModel.PROCESS,
+                                        space: ColorSpace.CMYK,
+                                        colorValue: [ record.cyan, record.magenta, record.yellow, record.black ]
+                                    });
+                                    break;
+                                case SWBL.C.LOWERCASE_COLORSPACE_RGB:
+                                    color = io_document.colors.add({
+                                        model: ColorModel.PROCESS,
+                                        space: ColorSpace.RGB,
+                                        colorValue: [ record.red, record.green, record.blue ]
+                                    });
+                                    break;
+                                case SWBL.C.LOWERCASE_COLORSPACE_LAB:
+                                    color = io_document.colors.add({
+                                        model: ColorModel.PROCESS,
+                                        space: ColorSpace.LAB,
+                                        colorValue: [ record.L, record.a, record.b ]
+                                    });
+                                    break;
+                            }
                         }
-
-                        if (! color) {
-                            SWBL.logError(arguments, "cannot create color");
-                            success = false;
-                            break;
+                        if (color) {
+                            swatchPageItem.fillColor = color;
                         }
                         else {
-                            swatchPageItem.fillColor = color;
+                            swatchPageItem.fillColor = "None";
                         }
                     }
                 }
@@ -643,15 +736,15 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                 // Upcast from PageItem to more specific class
                 pageItem = pageItem.getElements()[0];
                 if (pageItem instanceof TextFrame) {
+
                     var parentStory = pageItem.parentStory;
-                    if (parentStory.characters.length < 1) {
-                        parentStory.insertionPoints.item(0).contents = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
+
+                    var fieldValue = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
+                    if (! fieldValue) {
+                        fieldValue = "";
                     }
-                    else {
-                        parentStory.characters.itemByRange(1, parentStory.characters.length - 1).remove();
-                        parentStory.insertionPoints.item(1).contents = SWBL.getFieldValueByRecordIdx(in_config, in_lowerCaseFieldName, io_spreadState.recordIdx);
-                        parentStory.characters.firstItem().remove();
-                    }
+
+                    parentStory.insertionPoints.item(0).contents = fieldValue;
                 }
             }
         }

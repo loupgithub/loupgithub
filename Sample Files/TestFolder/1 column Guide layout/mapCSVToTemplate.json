@@ -15,6 +15,7 @@
 	"fieldDefaults": {
 		"colorgroup": "",
 		"colorpage": "",
+		"colorgroup": "",
 		"colorspace": "lab"
 	}
 }
