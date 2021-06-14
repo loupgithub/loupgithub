@@ -346,9 +346,11 @@ SWBL.getFieldValue = function getFieldValue(in_config, in_fieldName, in_csvRecor
                         shifter--;
                     }
                     value = Math.floor(value + 0.5) + "";
-                    value = value.substr(0,value.length - digits) + "." + value.substr(value.length - digits);
+                    if (digits > 0) {
+                        value = value.substr(0,value.length - digits) + "." + value.substr(value.length - digits);
+                    }
+                    retVal = value;
                 }
-                retVal = value;
             }
       
         }
