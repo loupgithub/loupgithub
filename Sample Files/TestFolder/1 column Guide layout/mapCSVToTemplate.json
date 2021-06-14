@@ -1,12 +1,12 @@
 ﻿{
 
-	"comment1": "Map the field names in the CSV to the standardized field names used by the script",
+	"comment1": "Map the field names in the CSV to the standardized field names used by the script and template",
 
 	"fieldNameMap": {
-		"colorname": "Name",
-		"l": "Lab_L",
-		"a": "Lab_a",
-		"b": "Lab_b"
+		"colorname1": "Name",
+		"l1": "Lab_L",
+		"a1": "Lab_a",
+		"b1": "Lab_b"
 	},
 
 	"comment2": "Provide default values for any fields that are not provided in the CSV",
@@ -15,7 +15,6 @@
 	"fieldDefaults": {
 		"colorgroup": "",
 		"colorpage": "",
-		"colorgroup": "",
-		"colorspace": "lab"
+		"colorspace1": "lab"
 	}
 }

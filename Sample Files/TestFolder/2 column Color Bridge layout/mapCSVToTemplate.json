@@ -1,0 +1,39 @@
+﻿{
+
+	"comment1": "Map the field names in the CSV to the standardized field names used by the script and template",
+
+	"fieldNameMap": {
+		"colorname1": "Name Col1",
+		"red1": "RGB_R",
+		"green1": "RGB_G",
+		"blue1": "RGB_B",
+		"hex1": "HTML",
+		"colorname2": "Name Col2",
+		"cyan2": "tint CMYK_C",
+		"magenta2": "tint CMYK_M",
+		"yellow2": "tint CMYK_Y",
+		"black2": "tint CMYK_K",
+		"labelCyan": "label CMYK_C",
+		"labelMagenta": "label CMYK_M",
+		"labelYellow": "label CMYK_Y",
+		"labelBlack": "label CMYK_K"
+	},
+
+	"comment2": "Provide default values for any fields that are not provided in the CSV",
+	"comment3": "colorgroup and colorpage must be listed, but can be empty strings",
+
+	"fieldDefaults": {
+		"colorgroup": "",
+		"colorpage": "",
+		"colorspace1": "rgb",
+		"colorspace2": "cmyk"
+	},
+
+	"rounding": {
+		"labelCyan": 0,
+		"labelMagenta": 0,
+		"labelYellow": 0,
+		"labelBlack": 0
+	}
+}
+

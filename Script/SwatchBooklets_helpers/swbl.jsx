@@ -21,12 +21,15 @@ SWBL.analyzeSpread = function analyzeSpread(in_spread) {
             }
 
             var spreadData = {};
-            spreadData.pageItemsByType = {};
-            spreadData.pageItemsByName = {};
+            spreadData.fields = {};
+            //
+            // by root -> by typeIdx -> .indexedRepeatedItems -> by recordIdx -> by repeated element
+            // If without recordIdx:
+            // by root -> by typeIdx -> .nonIndexedRepeatedItems -> by repeated element
+            //
 
             var allPageItems = in_spread.allPageItems.slice(0);
             for (var pageItemIdx = 0; pageItemIdx < allPageItems.length; pageItemIdx++) {
-
                 do {
                     try {
                         var pageItem = allPageItems[pageItemIdx];
@@ -50,96 +53,87 @@ SWBL.analyzeSpread = function analyzeSpread(in_spread) {
                             pageItem.parentStory.contents = "";
                         }
 
-                        var pageItemsByType = spreadData.pageItemsByType[parsedScriptLabel.type];
-
-                        if (! pageItemsByType) {
-                            pageItemsByType = {};
-                            spreadData.pageItemsByType[parsedScriptLabel.type] = pageItemsByType;
-                        }
-
                         var pageItemInfo = {
                             id: pageItem.id,
-                            type: parsedScriptLabel.type,
+                            root: parsedScriptLabel.root,
                             name: parsedScriptLabel.name,
-                            idx: parsedScriptLabel.idx
+                            typeIdx: parsedScriptLabel.typeIdx,
+                            recordIdx: parsedScriptLabel.recordIdx
                         };
 
-                        if (parsedScriptLabel.idx === undefined) {
+                        var pageItemsByTypeIdx = spreadData.fields[parsedScriptLabel.root];
+                        if (! pageItemsByTypeIdx) {
+                            pageItemsByTypeIdx = [];
+                            spreadData.fields[parsedScriptLabel.root] = pageItemsByTypeIdx;
+                        }
 
-                            var nonIndexedItemList = pageItemsByType.nonIndexedItemList;
-                            if (! nonIndexedItemList) {
-                                nonIndexedItemList = [];
-                                pageItemsByType.nonIndexedItemList = nonIndexedItemList;
+                        var pageItemsByRecordIdx = pageItemsByTypeIdx[parsedScriptLabel.typeIdx];
+                        if (! pageItemsByRecordIdx) {
+                            pageItemsByRecordIdx = {
+                                nonIndexedRepeatedItems: undefined,
+                                indexedRepeatedItems: []
+                            };
+                            pageItemsByTypeIdx[parsedScriptLabel.typeIdx] = pageItemsByRecordIdx;
+                        }
+
+                        if (parsedScriptLabel.recordIdx === undefined) {
+                            var repeatedPageItems = pageItemsByRecordIdx.nonIndexedRepeatedItems;
+                            if (! repeatedPageItems) {
+                                repeatedPageItems = [];
+                                pageItemsByRecordIdx.nonIndexedRepeatedItems = repeatedPageItems;
                             }
-
-                            nonIndexedItemList.push(pageItemInfo);
                         }
                         else {
-
-                            var indexedItemLists = pageItemsByType.indexedItemLists;
-                            if (! indexedItemLists) {
-                                indexedItemLists = [];
-                                pageItemsByType.indexedItemLists = indexedItemLists;
+                            var repeatedPageItems = pageItemsByRecordIdx.indexedRepeatedItems[parsedScriptLabel.recordIdx];
+                            if (! repeatedPageItems) {
+                                repeatedPageItems = [];
+                                pageItemsByRecordIdx.indexedRepeatedItems[parsedScriptLabel.recordIdx] = repeatedPageItems;
                             }
 
-                            var itemForIdxList = indexedItemLists[parsedScriptLabel.idx];
-                            if (! itemForIdxList) {
-                                itemForIdxList = [];
-                                indexedItemLists[parsedScriptLabel.idx] = itemForIdxList;
-                            }
-
-                            itemForIdxList.push(pageItemInfo);
                         }
 
-                        if (! parsedScriptLabel.name) {
-                            break;
-                        }
-
-                        var pageItemsByName = spreadData.pageItemsByName[parsedScriptLabel.name];
-                        if (! pageItemsByName) {
-                            pageItemsByName = {};                            
-                            spreadData.pageItemsByName[parsedScriptLabel.name] = pageItemsByName;
-                        }
-
-                        if (parsedScriptLabel.idx === undefined) {
-                            var nonIndexedItemList = pageItemsByName.nonIndexedItemList;
-                            if (! nonIndexedItemList) {
-                                nonIndexedItemList = [];
-                                pageItemsByName.nonIndexedItemList = nonIndexedItemList;
-                            }
-                            nonIndexedItemList.push(pageItemInfo);
-                            break;
-                        }
-
-                        var indexedItemLists = pageItemsByName.indexedItemLists;
-                        if (! indexedItemLists) {
-                            indexedItemLists = [];
-                            pageItemsByName.indexedItemLists = indexedItemLists;
-                        }
-
-                        var itemForIdxList = indexedItemLists[parsedScriptLabel.idx];
-                        if (! itemForIdxList) {
-                            itemForIdxList = [];
-                            indexedItemLists[parsedScriptLabel.idx] = itemForIdxList;
-                        }
-
-                        itemForIdxList.push(pageItemInfo);
+                        repeatedPageItems.push(pageItemInfo);
 
                         if (
-                            pageItemsByName.minIdx === undefined 
+                            pageItemsByRecordIdx.minRecordIdx === undefined 
                         || 
-                            pageItemsByName.minIdx > parsedScriptLabel.idx
+                            pageItemsByRecordIdx.minRecordIdx > parsedScriptLabel.recordIdx
                         ) {
-                            pageItemsByName.minIdx = parsedScriptLabel.idx;
+                            pageItemsByRecordIdx.minRecordIdx = parsedScriptLabel.recordIdx;
                         }
 
                         if (
-                            pageItemsByName.maxIdx === undefined 
+                            pageItemsByRecordIdx.maxRecordIdx === undefined 
                         || 
-                            pageItemsByName.maxIdx < parsedScriptLabel.idx
+                            pageItemsByRecordIdx.maxRecordIdx < parsedScriptLabel.recordIdx
                         ) {
-                            pageItemsByName.maxIdx = parsedScriptLabel.idx;
+                            pageItemsByRecordIdx.maxRecordIdx = parsedScriptLabel.recordIdx;
                         }
+
+                        if (
+                            spreadData.minRecordIdx === undefined 
+                        || 
+                            spreadData.minRecordIdx > parsedScriptLabel.recordIdx
+                        ) {
+                            spreadData.minRecordIdx = parsedScriptLabel.recordIdx;
+                        }
+
+                        if (
+                            spreadData.maxRecordIdx === undefined 
+                        || 
+                            spreadData.maxRecordIdx < parsedScriptLabel.recordIdx
+                        ) {
+                            spreadData.maxRecordIdx = parsedScriptLabel.recordIdx;
+                        }
+
+                        if (
+                            spreadData.maxTypeIdx === undefined 
+                        || 
+                            spreadData.maxTypeIdx < parsedScriptLabel.typeIdx
+                        ) {
+                            spreadData.maxTypeIdx = parsedScriptLabel.typeIdx;
+                        }
+
                     }
                     catch (err) {
                         SWBL.logError(arguments, "page item throws " + err);
@@ -339,7 +333,24 @@ SWBL.getFieldValue = function getFieldValue(in_config, in_fieldName, in_csvRecor
                 break;
             }
 
-            retVal = in_csvRecord[fieldIdx];            
+            retVal = in_csvRecord[fieldIdx];
+
+            if (in_config.csvMap.rounding) {
+                var normalizedFieldName = SWBL.getNormalizedFieldName(in_fieldName);
+                if (normalizedFieldName in in_config.csvMap.rounding) {
+                    var digits = parseInt(in_config.csvMap.rounding[normalizedFieldName], 10);
+                    var value = parseFloat(retVal);
+                    var shifter = digits;
+                    while (shifter > 0) {
+                        value = value * 10;
+                        shifter--;
+                    }
+                    value = Math.floor(value + 0.5) + "";
+                    value = value.substr(0,value.length - digits) + "." + value.substr(value.length - digits);
+                }
+                retVal = value;
+            }
+      
         }
         catch (err) {
             SWBL.logError(arguments, "throws " + err);
@@ -422,6 +433,43 @@ SWBL.getRecordCount = function getRecordCount(in_config) {
     return retVal;
 }
 
+SWBL.getNormalizedFieldName = function getNormali(in_fieldName) {
+
+    var retVal = in_fieldName;
+
+    SWBL.logEntry(arguments);
+
+    do {
+
+        try {
+
+            var fieldName = in_fieldName.toLowerCase();
+            var rootName = fieldName.replace(SWBL.REGEXP_EXTRACT_ROOT, "$1");
+            var typeIdx = fieldName.replace(SWBL.REGEXP_EXTRACT_TYPEINDEX,"$1");
+            if (typeIdx) {
+                typeIdx = parseInt(typeIdx, 10);
+                if (typeIdx == NaN || typeIdx < 0) {
+                    typeIdx = "";
+                    rootName = fieldName;
+                }
+            }
+            if (! typeIdx) {
+                typeIdx = 1;
+            }
+
+            retVal = rootName + typeIdx;
+        }
+        catch (err) {
+            SWBL.logError(arguments, "throws " + err);
+        }
+    }
+    while (false);
+
+    SWBL.logExit(arguments);
+
+    return retVal;
+}
+
 SWBL.injectData = function injectData(io_document, in_config) {
 
     var success = false;
@@ -447,17 +495,6 @@ SWBL.injectData = function injectData(io_document, in_config) {
                 break;
             }
 
-            var fieldsToProcessSet = {};
-            fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP] = true;
-            fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORNAME] = true;
-            fieldsToProcessSet[SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE] = true;
-            fieldsToProcessSet[SWBL.C.LOWERCASE_LABEL_SWATCH] = true;
-            for (var lowerCaseFieldName in in_config.lowerCasedFieldSet) {
-                if (lowerCaseFieldName) {
-                    fieldsToProcessSet[lowerCaseFieldName] = true;
-                }
-            }
-
             var spreadState = {};
             spreadState.spreadIdx = 0;
             spreadState.recordsUsedOnSpread = 0;
@@ -470,12 +507,39 @@ SWBL.injectData = function injectData(io_document, in_config) {
             success = true;
 
             while (spreadState.recordCountToProcess > 0) {
-                for (var lowerCaseFieldName in fieldsToProcessSet) {
-                    success = SWBL.injectField(io_document, in_config, spreadState, lowerCaseFieldName);
+
+                success = SWBL.injectField(io_document, in_config, spreadState, SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP);
+                if (! success) {
+                    break;
+                }
+
+                success = SWBL.injectField(io_document, in_config, spreadState, SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE);
+                if (! success) {
+                    break;
+                }
+
+                for (var lowerCaseFieldName in in_config.lowerCasedFieldSet) {
+                    if (lowerCaseFieldName) {
+                        success = SWBL.injectField(io_document, in_config, spreadState, lowerCaseFieldName);
+                        if (! success) {
+                            break;
+                        }
+                    }
+                }
+                if (! success) {
+                    break;
+                }
+
+                for (var typeIdx = 1; typeIdx <= spreadState.spreadInfo.maxTypeIdx; typeIdx++) {
+                    success = SWBL.injectField(io_document, in_config, spreadState, SWBL.C.LOWERCASE_LABEL_SWATCH + typeIdx);
                     if (! success) {
                         break;
                     }
                 }
+                if (! success) {
+                    break;
+                }
+
                 spreadState.recordsUsedOnSpread++;
                 spreadState.recordCountToProcess--;
                 spreadState.recordIdx++;
@@ -524,6 +588,12 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                 break;
             }
 
+            var rootName = in_lowerCaseFieldName.replace(SWBL.REGEXP_EXTRACT_ROOT, "$1");
+            var typeIdx = in_lowerCaseFieldName.replace(SWBL.REGEXP_EXTRACT_TYPEINDEX,"$1");
+            if (typeIdx) {
+                typeIdx = parseInt(typeIdx, 10);
+            }
+
             if (io_spreadState.initialized) {
 
                 var skippedRecords = 0;
@@ -559,7 +629,7 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                     io_spreadState.spreadIdx++;
                     io_spreadState.spread = undefined;
                     io_spreadState.recordsUsedOnSpread = 0;
-                    io_spreadState.maxIdx = undefined;
+                    io_spreadState.maxRecordIdx = undefined;
                     io_spreadState.initializedColorPage = undefined;
                 }
             }
@@ -589,60 +659,43 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
             if (io_spreadState.spread == undefined) {
 
                 io_spreadState.spread = io_document.spreads.item(io_spreadState.spreadIdx);
-                io_spreadState.spreadInfo = SWBL.analyzeSpread(io_spreadState.spread);
+                var spreadInfo = SWBL.analyzeSpread(io_spreadState.spread);
 
-                if (! io_spreadState.spreadInfo) {
-                    SWBL.logError(arguments, "need io_spreadState.spreadInfo");
-                    success = false;
-                    break;
-                }
-                
-                if (! io_spreadState.spreadInfo.pageItemsByName) {
-                    SWBL.logError(arguments, "need io_spreadState.spreadInfo.pageItemsByName");
-                    success = false;
-                    break;
-                }
-                
-                if (! io_spreadState.spreadInfo.pageItemsByType) {
-                    SWBL.logError(arguments, "need io_spreadState.spreadInfo.pageItemsByType");
+                if (! spreadInfo) {
+                    SWBL.logError(arguments, "need spreadInfo");
                     success = false;
                     break;
                 }
 
-                io_spreadState.pageItemsByName = io_spreadState.spreadInfo.pageItemsByName;
-                io_spreadState.pageItemsByType = io_spreadState.spreadInfo.pageItemsByType;
+                io_spreadState.spreadInfo = spreadInfo;
+                for (var typeIdx = 1; typeIdx <= spreadInfo.maxTypeIdx; typeIdx++) {
+                    for (var scanRootName in spreadInfo.fields) {
+                        var rootInfo = spreadInfo.fields[scanRootName];
+                        if (typeIdx in rootInfo) {
+                            var fieldInfo = rootInfo[typeIdx];
+                            if (fieldInfo.minRecordIdx != 0) {
+                                for (var missingMinIdx = 0; missingMinIdx < fieldInfo.minRecordIdx; missingMinIdx++) {
+                                    SWBL.logWarning(arguments, "Spread is missing " + scanRootName + typeIdx + "_" + (missingMinIdx+1));
+                                }
+                            }
+                            if (io_spreadState.maxRecordIdx === undefined) {
+                                io_spreadState.maxRecordIdx = fieldInfo.maxRecordIdx;
+                                io_spreadState.maxRecordIdxIsForField = scanRootName + typeIdx;
+                            }
+                            else {
+                                if (io_spreadState.maxRecordIdx != fieldInfo.maxRecordIdx) {
+                                    SWBL.logWarning(arguments, "Spread has incorrect number of occurrences for certain fields: " + io_spreadState.maxRecordIdxIsForField + " vs. " + scanRootName + typeIdx);
+                                }
+                                if (io_spreadState.maxRecordIdx < fieldInfo.maxRecordIdx) {
+                                    io_spreadState.maxRecordIdx = fieldInfo.maxRecordIdx;
+                                }
+                            }
+                        }
+                    }
 
-                if (
-                    io_spreadState.pageItemsByType.swatch
-                &&
-                    io_spreadState.pageItemsByType.swatch.indexedItemLists
-                ) {
-                    io_spreadState.swatchPageItemInfoLists = io_spreadState.pageItemsByType.swatch.indexedItemLists;
                 }
 
-                for (var scanLowerCaseFieldName in io_spreadState.pageItemsByName) {
-
-                    var pageItemsForFieldInfo = io_spreadState.pageItemsByName[scanLowerCaseFieldName];
-                    if (pageItemsForFieldInfo.minIdx != 0) {
-                        for (var missingMinIdx = 0; missingMinIdx < pageItemsForFieldInfo.minIdx; missingMinIdx++) {
-                            SWBL.logWarning(arguments, "Spread is missing " + scanLowerCaseFieldName + "_" + (missingMinIdx+1));
-                        }
-                    }
-
-                    if (io_spreadState.maxIdx === undefined) {
-                        io_spreadState.maxIdx = pageItemsForFieldInfo.maxIdx;
-                        io_spreadState.maxIdxIsForField = scanLowerCaseFieldName;
-                    }
-                    else {
-                        if (io_spreadState.maxIdx != pageItemsForFieldInfo.maxIdx) {
-                            SWBL.logWarning(arguments, "Spread has incorrect number of occurrences for certain fields: " + io_spreadState.maxIdxIsForField + " vs. " + scanLowerCaseFieldName);
-                        }
-                        if (io_spreadState.maxIdx < pageItemsForFieldInfo.maxId) {
-                            io_spreadState.maxIdx = pageItemsForFieldInfo.maxId;
-                        }
-                    }
-                }
-                io_spreadState.spreadRecordCount = io_spreadState.maxIdx + 1;
+                io_spreadState.spreadRecordCount = spreadInfo.maxRecordIdx + 1;
 
                 if (! io_spreadState.initialized) {
                     io_spreadState.initialized = true;
@@ -671,17 +724,33 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
 
             var curSpreadEntryIdx = io_spreadState.recordsUsedOnSpread;
 
-            if (in_lowerCaseFieldName == SWBL.C.LOWERCASE_LABEL_SWATCH) {
+            if (rootName == SWBL.C.LOWERCASE_LABEL_SWATCH) {
                 var swatchPageItemInfoLists = undefined;
-                if (io_spreadState.swatchPageItemInfoLists) {
-                    swatchPageItemInfoLists = io_spreadState.swatchPageItemInfoLists[curSpreadEntryIdx];
+                var spreadInfo;
+                var spreadInfoFields;
+                var swatchFields;
+                var swatchField;
+                var swatchRepeatedItems;
+                if (
+                    (spreadInfo = io_spreadState.spreadInfo)
+                &&
+                    (spreadInfoFields = spreadInfo.fields)
+                &&
+                    (swatchFields = spreadInfoFields[SWBL.C.LOWERCASE_LABEL_SWATCH])
+                &&
+                    (swatchField = swatchFields[typeIdx])
+                &&
+                    (swatchRepeatedItems = swatchField.indexedRepeatedItems)
+                ) {
+                    swatchPageItemInfoLists = swatchRepeatedItems[curSpreadEntryIdx];
                     for (var swatchPageItemIdx = 0; swatchPageItemIdx < swatchPageItemInfoLists.length; swatchPageItemIdx++) {
                         var swatchPageItemInfo = swatchPageItemInfoLists[swatchPageItemIdx];
                         var swatchPageItem = io_spreadState.spread.pageItems.itemByID(swatchPageItemInfo.id);
                         // Upcast from PageItem to more specific class
                         swatchPageItem = swatchPageItem.getElements()[0];
-                        var colorSpace = in_config.colorSpace;
-                        var record = in_config.data[io_spreadState.recordIdx];
+                        var rawRecord = in_config.data[io_spreadState.recordIdx];
+                        var record = rawRecord.colorDataByTypeIdx[typeIdx];
+                        var colorSpace = record.colorSpace;
                         var color = undefined;
                         if (io_spreadState.recordIdx < in_config.data.length) {
                             switch (colorSpace) {
@@ -719,12 +788,17 @@ SWBL.injectField = function injectField(io_document, in_config, io_spreadState, 
                 break;
             }
 
-            var pageItemsForFieldInfo = io_spreadState.pageItemsByName[in_lowerCaseFieldName];
-            if (! pageItemsForFieldInfo) {
+            var pageItemsForRootInfo = io_spreadState.spreadInfo.fields[rootName];
+            if (! pageItemsForRootInfo) {
+                break;
+            }
+            
+            var pageItemsForFieldInfo = pageItemsForRootInfo[typeIdx];
+            if (! pageItemsForFieldInfo || ! pageItemsForFieldInfo.indexedRepeatedItems) {
                 break;
             }
 
-            var pageItemInfoList = pageItemsForFieldInfo.indexedItemLists[curSpreadEntryIdx];
+            var pageItemInfoList = pageItemsForFieldInfo.indexedRepeatedItems[curSpreadEntryIdx];
             if (! pageItemInfoList) {
                 SWBL.logWarning(arguments, "Spread is missing " + in_lowerCaseFieldName + "_" + (curSpreadEntryIdx + 1));
                 break;
@@ -868,7 +942,9 @@ SWBL.parseCSV = function parseCSV(in_csvFile, in_optionalCSVMap) {
                                 ) {
                                     lowerCaseFieldName = in_optionalCSVMap.fieldMapCSVToInternal[lowerCaseFieldName]
                                 }
-                                parsedData.lowerCasedFieldSet[lowerCaseFieldName] = fieldIdx;
+
+                                var normalizedFieldName = SWBL.getNormalizedFieldName(lowerCaseFieldName);
+                                parsedData.lowerCasedFieldSet[normalizedFieldName] = fieldIdx;
                             }
                         }
                     }
@@ -897,6 +973,10 @@ SWBL.parseCSV = function parseCSV(in_csvFile, in_optionalCSVMap) {
     return retVal;
 }
 
+SWBL.REGEXP_EXTRACT_ROOT = /^([^_]*?)(\d*)(_.*)?$/;
+SWBL.REGEXP_EXTRACT_TYPEINDEX = /^[^_]*?(\d*)(_.*)?$/;
+SWBL.REGEXP_EXTRACT_RECORDINDEX = /^[^_]*_(\d*)$/;
+
 SWBL.parseScriptLabel = function parseScriptLabel(in_label) {
 
     var retVal = undefined;
@@ -916,68 +996,110 @@ SWBL.parseScriptLabel = function parseScriptLabel(in_label) {
 
             // Labels are of the form 
             //
+            //   swatch
             //   colorpage
             //   colorgroup
             //   name
-            //   name_idx (e.g. swatch_3)
             // 
-            if (label == SWBL.C.LOWERCASE_LABEL_COLORGROUP) {
-                retVal = {
-                    type: SWBL.C.LOWERCASE_LABEL_COLORGROUP
-                };
+            //   Labels can have two indices appended to them.
+            //
+            //   A name can be followed immediately by a numerical index (e.g. when showing two
+            //   color swatches per record - we can have swatch1 and swatch2)
+            //  
+            //   A name without numerical suffix is handled the same as '1' - e.g. 'swatch' === 'swatch1'
+            // 
+            //   Additionally, they can be followed by an underscore and an record number index
+            //
+            //   name_idx (e.g. swatch_3, swatch2_3, name2_3 would be elements that correspond to the
+            //   third record on the page).
+            // 
+            //   In short: the first index is attached to the label (no separator) and the second index
+            //   is prefixed with an underscore
+            //
+            //   Both idx in the script label are 1-based
+            // 
+
+
+            var rootName = label.replace(SWBL.REGEXP_EXTRACT_ROOT,"$1");
+            if (! rootName) {
                 break;
             }
+            var itemName = rootName;
 
-            if (label == SWBL.C.LOWERCASE_LABEL_COLORPAGE) {
-                retVal = {
-                    type: SWBL.C.LOWERCASE_LABEL_COLORPAGE
-                };
-                break;
+            var typeIdx = label.replace(SWBL.REGEXP_EXTRACT_TYPEINDEX,"$1");
+            if (typeIdx) {
+                var numTypeIdx = parseInt(typeIdx, 10);
+                if (numTypeIdx == NaN || numTypeIdx < 1) {
+                    itemName += typeIdx;
+                    typeIdx = "";
+                }
+                else {
+                    typeIdx = numTypeIdx;
+                }
             }
-
-            var labelSplit = in_label.split("_");
-            var itemName = labelSplit[0];
-            if (! itemName) {
-                break;
+            if (! typeIdx) {
+                typeIdx = 1;
             }
+            itemName += typeIdx;
 
-            if (labelSplit.length == 1) {
+            var recordIdx = label.replace(SWBL.REGEXP_EXTRACT_RECORDINDEX,"$1");
+
+            if (! recordIdx) {
+
+                if (itemName == SWBL.C.LOWERCASE_LABEL_COLORGROUP) {
+                    retVal = {
+                        type: SWBL.C.LOWERCASE_LABEL_COLORGROUP,
+                        root: rootName,
+                        name: itemName,
+                        typeIdx: typeIdx
+                    };
+                    break;
+                }
+
+                if (itemName == SWBL.C.LOWERCASE_LABEL_COLORPAGE) {
+                    retVal = {
+                        type: SWBL.C.LOWERCASE_LABEL_COLORPAGE,
+                        root: rootName,
+                        name: itemName,
+                        typeIdx: typeIdx
+                    };
+                    break;
+                }
+
                 retVal = {
                     type: SWBL.C.LOWERCASE_LABEL_FIELD,
-                    name: itemName
-                };
+                    root: rootName,
+                    name: itemName,
+                    typeIdx: typeIdx
+                };                
                 break;
             }
 
-            if (labelSplit.length != 2) {
-                break;
-            }
-
-            var itemIdx = labelSplit[1];
-            if (! itemIdx) {
-                break;
-            }
-
-            itemIdx = parseInt(itemIdx, 10);
-            if (itemIdx == NaN || itemIdx < 1) {
+            recordIdx = parseInt(recordIdx, 10);
+            if (recordIdx == NaN || recordIdx < 1) {
                 break;
             }
 
             // Swap 1-based index with 0-based index
-            itemIdx--;
+            recordIdx--;
 
-            if (itemName == SWBL.C.LOWERCASE_LABEL_SWATCH) {
+            if (rootName == SWBL.C.LOWERCASE_LABEL_SWATCH) {
                 retVal = {
                     type: SWBL.C.LOWERCASE_LABEL_SWATCH,
-                    idx: itemIdx
+                    root: rootName,
+                    name: itemName,
+                    typeIdx: typeIdx,
+                    recordIdx: recordIdx
                 };
                 break;
             }
 
             retVal = {
                 type: SWBL.C.LOWERCASE_LABEL_INDEXED_FIELD,
+                root: rootName,
                 name: itemName,
-                idx: itemIdx
+                typeIdx: typeIdx,
+                recordIdx: recordIdx
             };
 
             break;
@@ -1025,28 +1147,6 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
 
             if (
             !   (            
-                    (SWBL.C.LOWERCASE_FIELDNAME_COLORNAME in io_config.lowerCasedFieldSet)
-                ||
-                    (in_optionalCSVMap && (SWBL.C.LOWERCASE_FIELDNAME_COLORNAME in in_optionalCSVMap.fieldMapInternalToDefault))
-                ) 
-            ) {
-                SWBL.logError(arguments, "need field " + SWBL.C.LOWERCASE_FIELDNAME_COLORNAME);
-                break;
-            }
-
-            if (
-            !   (            
-                    (SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE in io_config.lowerCasedFieldSet)
-                ||
-                    (in_optionalCSVMap && (SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE in in_optionalCSVMap.fieldMapInternalToDefault))
-                ) 
-            ) {
-                SWBL.logError(arguments, "need field " + SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE);
-                break;
-            }
-
-            if (
-            !   (            
                     (SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE in io_config.lowerCasedFieldSet)
                 ||
                     (in_optionalCSVMap && (SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE in in_optionalCSVMap.fieldMapInternalToDefault))
@@ -1056,9 +1156,8 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                 break;
             }
 
+
             var colorGroupFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP];
-            var colorNameFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORNAME];
-            var colorSpaceFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE];
             var colorPageFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE];
 
             if (! io_config.data) {
@@ -1071,291 +1170,296 @@ SWBL.processConfig = function processConfig(io_config, in_optionalCSVMap) {
                 break;
             }
 
-            success = true;            
+            success = true;   
 
-            var cyanFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_CYAN];
-            if (cyanFieldIdx === undefined) {
-                cyanFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE1];
-            }
+            var typeIdx = 1;
 
-            var redFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_RED];
-            if (redFieldIdx === undefined) {
-                redFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE1];
-            }
+            do {         
 
-            var lFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_L];
-            if (lFieldIdx === undefined) {
-                lFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE1];
-            }
+                var colorNameFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORNAME + typeIdx];
+                var colorSpaceFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE + typeIdx];
 
-            var magentaFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_MAGENTA];
-            if (magentaFieldIdx === undefined) {
-                magentaFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE2];
-            }
+                var cyanFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_CYAN + typeIdx];
+                var magentaFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_MAGENTA + typeIdx];
+                var yellowFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_YELLOW + typeIdx];
+                var blackFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_BLACK + typeIdx];
 
-            var greenFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_GREEN];
-            if (greenFieldIdx === undefined) {
-                greenFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE2];
-            }
+                var redFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_RED + typeIdx];
+                var greenFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_GREEN + typeIdx];
+                var blueFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_BLUE + typeIdx];
 
-            var aFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_A];
-            if (aFieldIdx === undefined) {
-                aFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE2];
-            }
+                var lFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_L + typeIdx];
+                var aFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_A + typeIdx];
+                var bFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_B + typeIdx];
 
-            var yellowFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_YELLOW];
-            if (yellowFieldIdx === undefined) {
-                yellowFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE3];
-            }
+                io_config.csvMap = in_optionalCSVMap;
 
-            var blueFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_BLUE];
-            if (blueFieldIdx === undefined) {
-                blueFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE3];
-            }
+                var typeIsPresent = false;
+                var allColorsForTypeAreOK = true;
 
-            var bFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_B];
-            if (bFieldIdx === undefined) {
-                bFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE3];
-            }
+                for (var colorIdx = 0; colorIdx < io_config.data.length; colorIdx++) {
 
-            var blackFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_BLACK];
-            if (blackFieldIdx === undefined) {
-                blackFieldIdx = io_config.lowerCasedFieldSet[SWBL.C.LOWERCASE_FIELDNAME_COLORVALUE4];
-            }
+                    do {
 
-            io_config.colorSpace = undefined;
-            io_config.colorGroup = undefined;
-            io_config.csvMap = in_optionalCSVMap;
+                        var colorIsOK = true;
 
-            for (var colorIdx = 0; colorIdx < io_config.data.length; colorIdx++) {
+                        var colorRecord = io_config.data[colorIdx];
 
-                var colorData = io_config.data[colorIdx];
+                        var colorDataByTypeIdx = colorRecord.colorDataByTypeIdx;
+                        if (! colorDataByTypeIdx) {
+                            colorDataByTypeIdx = [];
+                            colorRecord.colorDataByTypeIdx = colorDataByTypeIdx;
+                        }
 
-                var colorGroup = colorData[colorGroupFieldIdx];
-                if (in_optionalCSVMap && colorGroup === undefined) {
-                    colorGroup = in_optionalCSVMap.fieldMapInternalToDefault.colorgroup;
-                }
+                        var colorName = colorRecord[colorNameFieldIdx];
+                        if (in_optionalCSVMap && colorName === undefined) {
+                            colorName = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_COLORNAME + typeIdx];
+                        }
+                        var colorSpace = colorRecord[colorSpaceFieldIdx];
+                        if (in_optionalCSVMap && colorSpace === undefined) {
+                            colorSpace = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_COLORSPACE + typeIdx];
+                        }
 
-                var colorName = colorData[colorNameFieldIdx];
-                if (in_optionalCSVMap && colorName === undefined) {
-                    colorName = in_optionalCSVMap.fieldMapInternalToDefault.colorname;
-                }
+                        if (! colorSpace && ! colorName) {
+                            break;
+                        }
 
-                var colorSpace = colorData[colorSpaceFieldIdx];
-                if (in_optionalCSVMap && colorSpace === undefined) {
-                    colorSpace = in_optionalCSVMap.fieldMapInternalToDefault.colorspace;
-                }
-
-                var colorPage = colorData[colorPageFieldIdx];
-                if (in_optionalCSVMap && colorPage === undefined) {
-                    colorPage = in_optionalCSVMap.fieldMapInternalToDefault.colorpage;
-                }
-
-                var colorIsOK = true;
-
-                if (! colorSpace) {
-                    colorIsOK = false;
-                    SWBL.logError(arguments, "no color type for color #" + (colorIdx + 1));
-                }
-                else {
-
-                    var lowercaseColorSpace = colorSpace.toLowerCase();
-                    if (! (lowercaseColorSpace in SWBL.C.SET_LOWERCASE_COLORSPACE)) {
                         colorIsOK = false;
-                        SWBL.logError(arguments, "unexpected color type for color #" + (colorIdx + 1));
-                    }
+                        typeIsPresent = true;
 
-                    if (io_config.colorSpace === undefined) {
-                        io_config.colorSpace = lowercaseColorSpace;
-                    }
-                    else if (io_config.colorSpace != SWBL.C.LOWERCASE_COLORSPACE_MULTIPLE && io_config.colorSpace != lowercaseColorSpace) {
-                        io_config.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_MULTIPLE; 
-                        SWBL.logWarning(arguments, "multiple color models in CSV");
-                    }
-                }
+                        var colorData = {};
 
-                if (colorGroup === undefined) {
-                    colorIsOK = false;
-                    SWBL.logError(arguments, "no color group for color #" + (colorIdx + 1));
-                }
-                else if (io_config.colorGroup === undefined) {
-                    io_config.colorGroup = colorGroup;
-                }
-                else if (io_config.colorGroup != null && io_config.colorGroup != colorGroup) {
-                    // If multiple color groups in CSV, set config-level colorGroup to null - 
-                    // the data is only usable on a per-individual-color basis.
-                    io_config.colorGroup = null; 
-                }
-
-                if (! colorName) {
-                    colorIsOK = false;
-                    SWBL.logError(arguments, "no color name for color #" + (colorIdx + 1));
-                }
-
-                if (colorPage === undefined) {
-                    colorIsOK = false;
-                    SWBL.logError(arguments, "no color page for color #" + (colorIdx + 1));
-                }
-
-                if (colorIsOK) {
-                    switch (lowercaseColorSpace) {
-
-                        default:
-                            colorIsOK = false;
-                            SWBL.logError(arguments, "unexpected color type for color #" + (colorIdx + 1));
+                        if (! colorSpace) {
+                            SWBL.logError(arguments, "missing colorspace" + typeIdx + " for color #" + (colorIdx + 1));
                             break;
-                        
-                        case SWBL.C.LOWERCASE_COLORSPACE_RGB:
-
-                            var red = colorData[redFieldIdx];
-                            if (in_optionalCSVMap && red === undefined) {
-                                red = in_optionalCSVMap.fieldMapInternalToDefault.red;
-                            }
-                            if (red === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no red for color #" + (colorIdx + 1));
-                            }
-
-                            var green = colorData[greenFieldIdx];
-                            if (in_optionalCSVMap && green === undefined) {
-                                green = in_optionalCSVMap.fieldMapInternalToDefault.green;
-                            }
-                            if (green === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no green for color #" + (colorIdx + 1));
-                            }
-
-                            var blue = colorData[blueFieldIdx];
-                            if (in_optionalCSVMap && blue === undefined) {
-                                blue = in_optionalCSVMap.fieldMapInternalToDefault.blue;
-                            }
-                            if (blue === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no blue for color #" + (colorIdx + 1));
-                            }
-
-                            if (colorIsOK) {
-                                
-                                red = parseInt(red, 10);
-                                green = parseInt(green, 10);
-                                blue = parseInt(blue, 10);
-
-                                colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_RGB;
-                                colorData.colorGroup = colorGroup;
-                                colorData.colorPage = colorPage;
-
-                                colorData.red = red;
-                                colorData.green = green;
-                                colorData.blue = blue;
-                            }
+                        }
+                        var lowercaseColorSpace = colorSpace.toLowerCase();                        
+                        if (! (lowercaseColorSpace in SWBL.C.SET_LOWERCASE_COLORSPACE)) {
+                            SWBL.logError(arguments, "unexpected colorspace" + typeIdx + " for color #" + (colorIdx + 1));
                             break;
+                        }
 
-                        case SWBL.C.LOWERCASE_COLORSPACE_LAB:
-
-                            var L = colorData[lFieldIdx];
-                            if (in_optionalCSVMap && L === undefined) {
-                                L = in_optionalCSVMap.fieldMapInternalToDefault.l;
-                            }
-                            if (L === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no L value for color #" + (colorIdx + 1));
-                            }
-
-                            var a = colorData[aFieldIdx];
-                            if (in_optionalCSVMap && a === undefined) {
-                                a = in_optionalCSVMap.fieldMapInternalToDefault.a;
-                            }
-                            if (a === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no a value for color #" + (colorIdx + 1));
-                            }
-
-                            var b = colorData[bFieldIdx];
-                            if (in_optionalCSVMap && b === undefined) {
-                                b = in_optionalCSVMap.fieldMapInternalToDefault.b;
-                            }
-                            if (b === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no b value for color #" + (colorIdx + 1));
-                            }
-
-                            if (colorIsOK) {
-                                
-                                L = parseFloat(L);
-                                a = parseFloat(a);
-                                b = parseFloat(b);
-
-                                colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_LAB;
-                                colorData.colorGroup = colorGroup;
-                                colorData.colorPage = colorPage;
-
-                                colorData.L = L;
-                                colorData.a = a;
-                                colorData.b = b;
-                            }
+                        if (! colorName) {
+                            SWBL.logError(arguments, "missing colorname" + typeIdx + " for color #" + (colorIdx + 1));
                             break;
+                        }
 
-                        case SWBL.C.LOWERCASE_COLORSPACE_CMYK:
-                        
-                            var cyan = colorData[cyanFieldIdx];
-                            if (in_optionalCSVMap && cyan === undefined) {
-                                cyan = in_optionalCSVMap.fieldMapInternalToDefault.cyan;
-                            }
-                            if (cyan === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no cyan for color #" + (colorIdx + 1));
+                        if (typeIdx == 1) {
+
+                            var colorGroup = colorRecord[colorGroupFieldIdx];
+                            if (in_optionalCSVMap && colorGroup === undefined) {
+                                colorGroup = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_COLORGROUP];
                             }
 
-                            var magenta = colorData[magentaFieldIdx];
-                            if (in_optionalCSVMap && magenta === undefined) {
-                                magenta = in_optionalCSVMap.fieldMapInternalToDefault.magenta;
-                            }
-                            if (magenta === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no magenta for color #" + (colorIdx + 1));
+                            if (colorGroup === undefined) {
+                                SWBL.logError(arguments, "missing color group for color #" + (colorIdx + 1));
+                                break;
                             }
 
-                            var yellow = colorData[yellowFieldIdx];
-                            if (in_optionalCSVMap && yellow === undefined) {
-                                yellow = in_optionalCSVMap.fieldMapInternalToDefault.yellow;
+                            if (io_config.colorGroup === undefined) {
+                                io_config.colorGroup = colorGroup;
                             }
-                            if (yellow === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no yellow for color #" + (colorIdx + 1));
-                            }
-
-                            var black = colorData[blackFieldIdx];
-                            if (in_optionalCSVMap && black === undefined) {
-                                black = in_optionalCSVMap.fieldMapInternalToDefault.black;
-                            }
-                            if (black === undefined) {
-                                colorIsOK = false;
-                                SWBL.logError(arguments, "no black for color #" + (colorIdx + 1));
+                            else if (io_config.colorGroup != null && io_config.colorGroup != colorGroup) {
+                                // If multiple color groups in CSV, set config-level colorGroup to null - 
+                                // the data is only usable on a per-individual-color basis.
+                                io_config.colorGroup = null; 
                             }
 
-                            if (colorIsOK) {
-                                
-                                cyan = parseInt(cyan, 10);
-                                magenta = parseInt(magenta, 10);
-                                yellow = parseInt(yellow, 10);
-                                black = parseInt(black, 10);
-
-                                colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_CMYK;
-                                colorData.colorGroup = colorGroup;
-                                colorData.colorPage = colorPage;
-
-                                colorData.cyan = cyan;
-                                colorData.magenta = magenta;
-                                colorData.yellow = yellow;
-                                colorData.black = black;
+                            var colorPage = colorRecord[colorPageFieldIdx];
+                            if (in_optionalCSVMap && colorPage === undefined) {
+                                colorPage = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_COLORPAGE];
                             }
-                            break;
+
+                            if (colorPage === undefined) {
+                                SWBL.logError(arguments, "no color page for color #" + (colorIdx + 1));
+                                break;
+                            }
+
+                            if (io_config.colorPage === undefined) {
+                                io_config.colorPage = colorPage;
+                            }
+                            else if (io_config.colorPage != null && io_config.colorPage != colorPage) {
+                                // If multiple color pages in CSV, set config-level colorPage to null - 
+                                // the data is only usable on a per-individual-color basis.
+                                io_config.colorPage = null; 
+                            }
+
+                        }
+
+                        switch (lowercaseColorSpace) {
+
+                            default:
+                                SWBL.logError(arguments, "unexpected color type for color #" + (colorIdx + 1));
+                                break;
+                            
+                            case SWBL.C.LOWERCASE_COLORSPACE_RGB:
+
+                                colorIsOK = true;
+
+                                var red = colorRecord[redFieldIdx];
+                                if (in_optionalCSVMap && red === undefined) {
+                                    red = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_RED + typeIdx];
+                                }
+                                if (red === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no red" + typeIdx + " for color #" + (colorIdx + 1));
+                                }
+
+                                var green = colorRecord[greenFieldIdx];
+                                if (in_optionalCSVMap && green === undefined) {
+                                    green = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_GREEN + typeIdx];
+                                }
+                                if (green === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no green" + typeIdx + " for color #" + (colorIdx + 1));
+                                }
+
+                                var blue = colorRecord[blueFieldIdx];
+                                if (in_optionalCSVMap && blue === undefined) {
+                                    blue = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_BLUE + typeIdx];
+                                }
+                                if (blue === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no blue" + typeIdx + " for color #" + (colorIdx + 1));
+                                }
+
+                                if (colorIsOK) {
+                                    
+                                    red = parseInt(red, 10);
+                                    green = parseInt(green, 10);
+                                    blue = parseInt(blue, 10);
+
+                                    colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_RGB;
+                                    colorRecord.colorGroup = colorGroup;
+                                    colorRecord.colorPage = colorPage;
+
+                                    colorData.red = red;
+                                    colorData.green = green;
+                                    colorData.blue = blue;
+                                }
+                                break;
+
+                            case SWBL.C.LOWERCASE_COLORSPACE_LAB:
+
+                                colorIsOK = true;
+
+                                var L = colorRecord[lFieldIdx];
+                                if (in_optionalCSVMap && L === undefined) {
+                                    L = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_L + typeIdx];
+                                }
+                                if (L === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no L" + typeIdx + " value for color #" + (colorIdx + 1));
+                                }
+
+                                var a = colorRecord[aFieldIdx];
+                                if (in_optionalCSVMap && a === undefined) {
+                                    a = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_A + typeIdx];
+                                }
+                                if (a === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no a" + typeIdx + " value for color #" + (colorIdx + 1));
+                                }
+
+                                var b = colorRecord[bFieldIdx];
+                                if (in_optionalCSVMap && b === undefined) {
+                                    b = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_B + typeIdx];
+                                }
+                                if (b === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no b" + typeIdx + " value for color #" + (colorIdx + 1));
+                                }
+
+                                if (colorIsOK) {
+                                    
+                                    L = parseFloat(L);
+                                    a = parseFloat(a);
+                                    b = parseFloat(b);
+
+                                    colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_LAB;
+                                    colorRecord.colorGroup = colorGroup;
+                                    colorRecord.colorPage = colorPage;
+
+                                    colorData.L = L;
+                                    colorData.a = a;
+                                    colorData.b = b;
+                                }
+                                break;
+
+                            case SWBL.C.LOWERCASE_COLORSPACE_CMYK:
+                            
+                                colorIsOK = true;
+
+                                var cyan = colorRecord[cyanFieldIdx];
+                                if (in_optionalCSVMap && cyan === undefined) {
+                                    cyan = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_CYAN + typeIdx];
+                                }
+                                if (cyan === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no cyan" + typeIdx + " for color #" + (colorIdx + 1));
+                                }
+
+                                var magenta = colorRecord[magentaFieldIdx];
+                                if (in_optionalCSVMap && magenta === undefined) {
+                                    magenta = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_MAGENTA + typeIdx];
+                                }
+                                if (magenta === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no magenta" + typeIdx + " for color #" + (colorIdx + 1));
+                                }
+
+                                var yellow = colorRecord[yellowFieldIdx];
+                                if (in_optionalCSVMap && yellow === undefined) {
+                                    yellow = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_YELLOW + typeIdx];
+                                }
+                                if (yellow === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no yellow" + typeIdx + " for color #" + (colorIdx + 1));
+                                }
+
+                                var black = colorRecord[blackFieldIdx];
+                                if (in_optionalCSVMap && black === undefined) {
+                                    black = in_optionalCSVMap.fieldMapInternalToDefault[SWBL.C.LOWERCASE_FIELDNAME_BLACK + typeIdx];
+                                }
+                                if (black === undefined) {
+                                    colorIsOK = false;
+                                    SWBL.logError(arguments, "no black" + typeIdx + " for color #" + (colorIdx + 1));
+                                }
+
+                                if (colorIsOK) {
+                                    
+                                    cyan = parseInt(cyan, 10);
+                                    magenta = parseInt(magenta, 10);
+                                    yellow = parseInt(yellow, 10);
+                                    black = parseInt(black, 10);
+
+                                    colorData.colorSpace = SWBL.C.LOWERCASE_COLORSPACE_CMYK;
+                                    colorRecord.colorGroup = colorGroup;
+                                    colorRecord.colorPage = colorPage;
+
+                                    colorData.cyan = cyan;
+                                    colorData.magenta = magenta;
+                                    colorData.yellow = yellow;
+                                    colorData.black = black;
+                                }
+                                break;
+                        }
+
+                        if (colorIsOK) {
+                            colorDataByTypeIdx[typeIdx] = colorData;
+                        }
+                        else {
+                            allColorsForTypeAreOK = false;
+                        }
                     }
+                    while (false);
                 }
 
-                success = success && colorIsOK;
-
+                typeIdx++;
             }
+            while (typeIsPresent && allColorsForTypeAreOK);
+
+            success = typeIdx > 1 && allColorsForTypeAreOK;
         }
         catch (err) {
             SWBL.logError(arguments, "throws " + err);
@@ -1410,6 +1514,15 @@ SWBL.readCSVMap = function readCSVMap(in_csvFile) {
                 break;
             }
 
+            if (csvMap.rounding) {
+                var rounding = csvMap.rounding;
+                csvMap.rounding = {};
+                for (var fieldName in rounding) {
+                    var normalizedFieldName = SWBL.getNormalizedFieldName(fieldName);
+                    csvMap.rounding[normalizedFieldName] = rounding[fieldName];
+                }
+            }
+
             // Add lowercase-only fields (e.g. add 'fieldnamemap' to csvMap
             // even if input data is spelled 'fieldNamemap' or 'FielNameMap')
 
@@ -1427,14 +1540,12 @@ SWBL.readCSVMap = function readCSVMap(in_csvFile) {
 
             csvMap.fieldMapCSVToInternal = {};
 
-            csvMap.fieldMapInternalToCSV = {};
             csvMap.fieldMapInternalToDefault = {};
 
             if (csvMap.fieldnamemap) {
                 for (var fieldName in csvMap.fieldnamemap) {
                     var csvFieldName = csvMap.fieldnamemap[fieldName];
                     var internalFieldName = fieldName.toLowerCase();
-                    csvMap.fieldMapInternalToCSV[internalFieldName] = csvFieldName;
                     csvMap.fieldMapCSVToInternal[csvFieldName.toLowerCase()] = internalFieldName;
                 }
             }
